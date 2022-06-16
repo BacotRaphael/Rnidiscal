@@ -10,6 +10,41 @@ data <- read_excel("REACH_SOM2101_Final-Dataset_JMCNA_Somalia_01112021.xlsx", "C
 survey <- read_excel("REACH_SOM2101_Final-Dataset_JMCNA_Somalia_01112021.xlsx", "survey")
 choices <- read_excel("REACH_SOM2101_Final-Dataset_JMCNA_Somalia_01112021.xlsx", "choices")
 
+## try to compare tool and data unique values
+
+# compare.data
+list.unique.data <- lapply(data %>% select(where(function(x) sum(str_detect(x, "\\D"), na.rm=T) > length(x)*0.1)), unique)
+df.unique.data <- list.unique.data %>%
+  stack %>% group_by(name=ind) %>% summarise(values=paste0(values, collapse=" "))
+
+## slower versions 
+# unique.data <- data %>%
+#   mutate(across(everything(), as.character)) %>%
+#   pivot_longer(everything(), names_to="column", values_to="unique") %>%
+#   group_by(column) %>% summarise(unique=unique(unique))
+# unique.data <- data %>% 
+#   summarise(across(where(function(x) sum(str_detect(x, "\\D"), na.rm=T) > length(x)*0.1), ~paste0(unique(.), collapse=" "))) %>%
+#   pivot_longer(everything(), names_to="column", values_to="unique")
+
+unique.kobo <- survey %>% 
+  mutate(list_name = lapply(str_split(type, " "), function(x) ifelse(length(x)==1, NA_character_, x[[2]])) %>% unlist,
+         type = lapply(str_split(type, " "), function(x) x[[1]]) %>% unlist) %>%
+  select(name, type, list_name) %>% filter(str_detect(type, "^select_")) %>% 
+  left_join(choices %>% select(list_name, choice.name=name)) 
+
+unique.kobo$match <- NA
+for (r in nrow(unique.kobo)){
+  name.r <- unique.kobo %>% filter(row_number()==r) %>% pull(name)
+  choice.r <- unique.kobo %>% filter(row_number()==r) %>% pull(choice.name)
+  unique.kobo[r, "match"] <- choice.r %in% list.unique.data[[name.r]] 
+}
+
+  mutate(in_data = ifelse(choice.name %in% list.unique.data[[name]], T, F))
+
+
+
+# lapply(data, function(x) sum(str_detect(x, "\\D"), na.rm=T)>length(x)*0.1)
+
 ## shelter indicators
 ## Issue with columns between interveted
 # shelter type // CANNOT RETRIEVE ORIGINAL QUESTION FROM DATA, only the other shelter type.
